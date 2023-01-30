@@ -6,16 +6,23 @@
     :class="{'cursor-crosshair': toolType !== TOOLTYPE.CURSOR}"
     @mousedown="handleMousedown"
   >
-    <div class="absolute inset-0"><!-- 用于拖拽后记录偏移位置 --></div>
+    <div
+      class="absolute w-full h-full bg-slate-300"
+      ref="dragBox"
+      :style="{
+        left: dragData.left + 'px',
+        top: dragData.top + 'px'
+      }"
+    ><!-- 用于拖拽后记录偏移位置 --></div>
     <PaintCanvas
       class="relative z-50"
-      v-bind="{...containerSize, ...curPaintData, isPaintCanvas: true}" 
+      v-bind="{...containerSize, ...curPaintData, isPaintCanvas: true, dragData}" 
     />
     <PaintCanvas
       class="absolute top-0 left-0"
       v-for="(item, index) in canvasDataList"
       :key="index"
-      v-bind="{...containerSize, ...item}"
+      v-bind="{...containerSize, ...item, dragData}"
     ></PaintCanvas>
   </div>
 </template>
@@ -27,14 +34,20 @@ export default {
 </script>
 
 <script setup lang='ts'>
-  import { ref, reactive, onMounted } from 'vue';
+  import { ref, reactive, onMounted, computed } from 'vue';
   import bus from '@/utils/eventbus'
   import PaintCanvas from './PaintCanvas.vue';
   import { TOOLTYPE, DEFAULTTOOL } from '@/utils/enum'
-  import { pxToRatio } from '@/utils/common'
+  import { pxToRatio, PxArrType } from '@/utils/common'
+
+  onMounted(() => {
+    getPaintContainerSize()
+    // window.addEventListener('resize', getPaintContainerSize)
+  })
 
   // 容器相关
   const paintContainer = ref()
+  const dragBox = ref()
   const containerSize = reactive({
     width: 0,
     height: 0
@@ -45,7 +58,7 @@ export default {
     containerSize.height = clientHeight
   }
   
-  // 当前的工具类型
+  // 工具类型
   const toolType = ref(DEFAULTTOOL)
   bus.$on('toolType:update', (type) => {
     if (type === TOOLTYPE.CLEAR) {
@@ -56,11 +69,11 @@ export default {
   })
 
   // 封装pxToRatio
-  const handlePxToRatio = (e: MouseEvent) => {
-    return pxToRatio([e.offsetX, e.offsetY], [containerSize.width, containerSize.height])
+  const handlePxToRatio = (origin: PxArrType) => {
+    return pxToRatio(origin, [containerSize.width, containerSize.height])
   }
 
-  // 全部绘图数据
+  // 绘图数据
   type CanvasData = {
     type: string,
     data: string[][]
@@ -74,12 +87,30 @@ export default {
     type: '',
     data: [],
   })
+  const dragData = reactive({
+    lenX: 0,  // 开始位置与边界的距离
+    lenY: 0,
+    top: 0, // 偏移距离
+    left: 0
+  })
   const handleMousedown = (e: MouseEvent) => {
-    if(toolType.value === TOOLTYPE.CURSOR) return
-    isPainting.value = true
     paintContainer.value.addEventListener('mousemove', handleMousemove)
+    const lenX = e.clientX - paintContainer.value.offsetLeft
+    const lenY = e.clientY - paintContainer.value.offsetTop
 
-    const ratioArr = handlePxToRatio(e)
+    // 拖拽移动
+    if(toolType.value === TOOLTYPE.CURSOR) {
+      dragData.lenX = lenX - dragBox.value.offsetLeft
+      dragData.lenY = lenY - dragBox.value.offsetTop
+      return
+    }
+    
+    // 绘画移动
+    isPainting.value = true
+    const ratioArr = handlePxToRatio([
+      lenX - dragData.left,
+      lenY - dragData.top
+    ])
     curPaintData.type = toolType.value
     curPaintData.data = [ratioArr]
     if (toolType.value === TOOLTYPE.XUHAO) {
@@ -90,7 +121,21 @@ export default {
     }
   }
   const handleMousemove = (e: MouseEvent) => {
-    const ratioArr = handlePxToRatio(e)
+    const lenX = e.clientX - paintContainer.value.offsetLeft
+    const lenY = e.clientY - paintContainer.value.offsetTop
+
+    // 拖拽移动
+    if(toolType.value === TOOLTYPE.CURSOR) {
+      dragData.left = lenX - dragData.lenX
+      dragData.top = lenY - dragData.lenY
+      return
+    }
+
+    // 绘画移动
+    const ratioArr = handlePxToRatio([
+      lenX - dragData.left,
+      lenY - dragData.top
+    ])
     switch(toolType.value) {
       case TOOLTYPE.HUABI:
         curPaintData.data.push(ratioArr)
@@ -106,22 +151,20 @@ export default {
     }
   }
   const handleMouseup = () => {
+    paintContainer.value.removeEventListener('mousemove', handleMousemove)
+
     if (!isPainting.value) return
     isPainting.value = false
-    paintContainer.value.removeEventListener('mousemove', handleMousemove)
-    // 绘图数据
+
     if (curPaintData.data.length >= 2 || curPaintData.type === TOOLTYPE.XUHAO) {
       canvasDataList.value.push({...curPaintData})
     }
     curPaintData.data = []
 
-    console.log('canvasDataList', canvasDataList.value)
+    // console.log('canvasDataList', canvasDataList.value)
   }
   document.addEventListener('mouseup', handleMouseup)
 
-  onMounted(() => {
-    getPaintContainerSize()
-  })
 </script>
 
 <style lang='less' scoped>

@@ -19,19 +19,43 @@ export default {
     type: string,
     data: string[][],
     serial?: number,
-    isPaintCanvas?: boolean
+    isPaintCanvas?: boolean,
+    dragData: {
+      top: number,
+      left: number
+    }
   }>()
+  console.log(props)
 
   onMounted(() => {
+    ctx.value = paintCanvas.value.getContext('2d')
     if (!props.isPaintCanvas) {
       initCanvas()
       startPaint()
     }
   })
 
+  watch([
+    () => props.width,
+    () => props.height,
+    props.dragData
+  ], () => {
+    initCanvas()
+    startPaint()
+  })
+  
+  watch(() => props.data, () => {
+    startPaint()
+  }, {deep: true})
+
   // 封装ratioToPx
-  const handleRatioToPx = (origin: RatioArrType) => {
-    return ratioToPx(origin, [props.width, props.height])
+  const handleRatioToPx = (origin: RatioArrType, isAddDragSize = true) => {
+    let [x, y] = ratioToPx(origin, [props.width, props.height])
+    if (isAddDragSize) {
+      x += props.dragData.left
+      y += props.dragData.top
+    }
+    return [x, y]
   }
   // 封装pxToRatio
   const handlePxToRatio = (e: MouseEvent) => {
@@ -46,7 +70,6 @@ export default {
     top: 0
   })
   const initCanvas = () => {
-    ctx.value = paintCanvas.value.getContext('2d')
     if (props.isPaintCanvas) {
       paintCanvas.value.width = props.width
       paintCanvas.value.height = props.height
@@ -83,7 +106,7 @@ export default {
     maxRatioX += patchNum
     maxRatioY += patchNum
 
-    let [width, height] = handleRatioToPx([(maxRatioX - minRatioX).toString(), (maxRatioY - minRatioY).toString()])
+    let [width, height] = handleRatioToPx([(maxRatioX - minRatioX).toString(), (maxRatioY - minRatioY).toString()], false)
     // canvas最小宽高尺寸
     const minSize = 30
     paintCanvas.value.width = Math.max(width, minSize)
@@ -94,9 +117,6 @@ export default {
     canvasOffset.top  = top - (minSize - height > 0 ? (minSize - height) / 2 : 0)
     
   }
-  watch([() => props.width, () => props.height], () => {
-    initCanvas()
-  })
 
   // 开始绘画
   const startPaint = () => {
@@ -106,9 +126,6 @@ export default {
     }
     handlePaint()
   }
-  watch(() => props.data, () => {
-    startPaint()
-  }, { deep: true })
   
   // 清除画布
   const clearCanvas = () => {
@@ -180,7 +197,7 @@ export default {
     const [endX, endY] = handleRatioToPx(props.data[1])
 
     const radius  = Math.pow(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2), 0.5)
-    ctx.value.arc(x, y, radius, 0, Math.PI * 2, true)
+    ctx.value.arc(x, y, radius, 0, Math.PI * 2)
   }
   // 箭头
   const handleJIANTOU = ({canvasLeft, canvasTop, startX: x1, startY: y1}: HandlePaintParams) => {
@@ -206,7 +223,7 @@ export default {
     const radius = 14, fontSize = 16
     const [x, y] = [startX - canvasLeft, startY - canvasTop]
 
-    ctx.value.arc(x, y, radius, 0, Math.PI * 2, true)
+    ctx.value.arc(x, y, radius, 0, Math.PI * 2)
 
     ctx.value.font = `${fontSize}px sans-serif`
     ctx.value.textAlign = 'center'
