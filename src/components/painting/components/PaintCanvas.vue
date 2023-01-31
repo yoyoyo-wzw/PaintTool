@@ -45,6 +45,7 @@ export default {
   })
   
   watch(() => props.data, () => {
+    console.log(111)
     startPaint()
   }, {deep: true})
 
@@ -77,7 +78,7 @@ export default {
     }
 
     // canvas元素大小计算
-    let minRatioX = 1, minRatioY = 1, maxRatioX = 0, maxRatioY = 0
+    let minRatioX = Infinity, minRatioY = Infinity, maxRatioX = -Infinity, maxRatioY = -Infinity
     props.data.forEach(([ratioX, ratioY]) => {
       minRatioX = Math.min(minRatioX, +ratioX)
       minRatioY = Math.min(minRatioY, +ratioY)
