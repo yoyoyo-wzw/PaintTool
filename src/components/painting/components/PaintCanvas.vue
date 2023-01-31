@@ -25,7 +25,6 @@ export default {
       left: number
     }
   }>()
-  console.log(props)
 
   onMounted(() => {
     ctx.value = paintCanvas.value.getContext('2d')
@@ -45,7 +44,6 @@ export default {
   })
   
   watch(() => props.data, () => {
-    console.log(111)
     startPaint()
   }, {deep: true})
 
